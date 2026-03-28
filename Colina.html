@@ -1,0 +1,293 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Hill Climbing - Optimización</title>
+
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+
+<style>
+:root {
+    --primary: #f5576c;
+    --secondary: #f093fb;
+    --success: #27ae60;
+    --bg: #f5f6fa;
+}
+
+body {
+    font-family: 'Segoe UI', sans-serif;
+    background: linear-gradient(135deg, var(--secondary), var(--primary));
+    margin: 0;
+    padding: 20px;
+}
+
+.container {
+    max-width: 1100px;
+    margin: auto;
+    background: white;
+    border-radius: 15px;
+    overflow: hidden;
+    box-shadow: 0 20px 50px rgba(0,0,0,0.2);
+}
+
+.header {
+    background: linear-gradient(135deg, var(--secondary), var(--primary));
+    color: white;
+    text-align: center;
+    padding: 40px;
+}
+
+h1 { margin: 0; }
+
+.content {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 25px;
+    padding: 30px;
+}
+
+@media(max-width: 900px){
+    .content { grid-template-columns: 1fr; }
+}
+
+.card {
+    background: var(--bg);
+    padding: 20px;
+    border-radius: 12px;
+}
+
+input, button {
+    width: 100%;
+    padding: 10px;
+    margin-top: 8px;
+    border-radius: 8px;
+    border: 1px solid #ccc;
+}
+
+button {
+    background: var(--primary);
+    color: white;
+    font-weight: bold;
+    cursor: pointer;
+}
+
+button:hover {
+    opacity: 0.9;
+}
+
+.result {
+    border-left: 5px solid var(--success);
+    display: none;
+}
+
+.result.show { display: block; }
+
+canvas { height: 300px !important; }
+
+</style>
+</head>
+
+<body>
+
+<div class="container">
+
+    <div class="header">
+        <h1>⛰️ Hill Climbing</h1>
+        <p>Optimización por búsqueda local</p>
+    </div>
+
+    <div class="content">
+
+        <!-- CONFIG -->
+        <div class="card">
+            <h3>⚙️ Parámetros</h3>
+
+            <label>Punto inicial</label>
+            <input type="number" id="start" value="-5">
+
+            <label>Paso</label>
+            <input type="range" id="step" min="0.1" max="2" step="0.1" value="0.5">
+            <span id="stepValue">0.5</span>
+
+            <label>Iteraciones</label>
+            <input type="number" id="iterations" value="50">
+
+            <button onclick="app.run()">▶ Ejecutar</button>
+            <button onclick="app.reset()">🔄 Reset</button>
+        </div>
+
+        <!-- GRAPH -->
+        <div class="card">
+            <h3>📊 Gráfica</h3>
+            <canvas id="chart"></canvas>
+        </div>
+
+        <!-- RESULT -->
+        <div class="card result" id="resultBox">
+            <h3>✅ Resultado</h3>
+            <p><b>X:</b> <span id="resX"></span></p>
+            <p><b>f(x):</b> <span id="resFx"></span></p>
+            <p><b>Iteraciones:</b> <span id="resIter"></span></p>
+        </div>
+
+    </div>
+
+</div>
+
+<script>
+
+/* =========================
+   MODELO (LÓGICA)
+========================= */
+
+class HillClimbing {
+
+    static f(x) {
+        return -x*x + 5*x;
+    }
+
+    static optimize(start, step, maxIter) {
+        let x = start;
+        let history = [{x, y: this.f(x)}];
+
+        for(let i=0; i<maxIter; i++) {
+
+            const left = x - step;
+            const right = x + step;
+
+            const best = this.f(left) > this.f(right) ? left : right;
+
+            if(this.f(best) <= this.f(x)) break;
+
+            x = best;
+            history.push({x, y: this.f(x)});
+        }
+
+        return {
+            x,
+            fx: this.f(x),
+            iterations: history.length - 1,
+            history
+        };
+    }
+}
+
+/* =========================
+   VISTA (GRÁFICA)
+========================= */
+
+class ChartManager {
+
+    constructor(canvasId) {
+        this.ctx = document.getElementById(canvasId);
+        this.chart = null;
+    }
+
+    generateFunctionData() {
+        const data = [];
+        for(let x=-10; x<=10; x+=0.1){
+            data.push({x, y: HillClimbing.f(x)});
+        }
+        return data;
+    }
+
+    draw(start = null, history = []) {
+
+        if(this.chart) this.chart.destroy();
+
+        const datasets = [{
+            label: 'Función',
+            data: this.generateFunctionData(),
+            borderWidth: 2,
+            fill: true
+        }];
+
+        if(start !== null){
+            datasets.push({
+                label: 'Inicio',
+                data: [{x:start, y:HillClimbing.f(start)}],
+                pointRadius: 6
+            });
+        }
+
+        if(history.length){
+            datasets.push({
+                label: 'Camino',
+                data: history,
+                borderDash: [5,5],
+                pointRadius: 4
+            });
+        }
+
+        this.chart = new Chart(this.ctx, {
+            type: 'line',
+            data: { datasets },
+            options: {
+                scales: { x: { type: 'linear' } }
+            }
+        });
+    }
+}
+
+/* =========================
+   CONTROLADOR (APP)
+========================= */
+
+class App {
+
+    constructor(){
+        this.chart = new ChartManager("chart");
+        this.init();
+    }
+
+    init(){
+        document.getElementById("step").addEventListener("input", e=>{
+            document.getElementById("stepValue").innerText = e.target.value;
+        });
+        this.chart.draw();
+    }
+
+    run(){
+        const start = parseFloat(startInput.value);
+        const step = parseFloat(stepInput.value);
+        const maxIter = parseInt(iterInput.value);
+
+        const result = HillClimbing.optimize(start, step, maxIter);
+
+        this.showResult(result);
+        this.chart.draw(start, result.history);
+    }
+
+    showResult(res){
+        resultBox.classList.add("show");
+        resX.innerText = res.x.toFixed(4);
+        resFx.innerText = res.fx.toFixed(4);
+        resIter.innerText = res.iterations;
+    }
+
+    reset(){
+        resultBox.classList.remove("show");
+        this.chart.draw();
+    }
+}
+
+/* =========================
+   INSTANCIA GLOBAL
+========================= */
+
+const startInput = document.getElementById("start");
+const stepInput = document.getElementById("step");
+const iterInput = document.getElementById("iterations");
+
+const resultBox = document.getElementById("resultBox");
+const resX = document.getElementById("resX");
+const resFx = document.getElementById("resFx");
+const resIter = document.getElementById("resIter");
+
+const app = new App();
+
+</script>
+
+</body>
+</html>
