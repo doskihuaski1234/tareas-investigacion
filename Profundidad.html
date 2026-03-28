@@ -1,0 +1,299 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>DFS Interactivo Profesional</title>
+
+<style>
+:root{
+    --primary:#667eea;
+    --secondary:#764ba2;
+    --success:#27ae60;
+    --select:#f39c12;
+}
+
+body{
+    font-family:'Segoe UI',sans-serif;
+    background:linear-gradient(135deg,var(--primary),var(--secondary));
+    display:flex;
+    justify-content:center;
+    align-items:center;
+    height:100vh;
+    margin:0;
+}
+
+.container{
+    background:white;
+    border-radius:15px;
+    width:900px;
+    padding:30px;
+    box-shadow:0 20px 50px rgba(0,0,0,0.3);
+}
+
+h1{
+    text-align:center;
+    color:var(--primary);
+}
+
+.grid{
+    display:grid;
+    grid-template-columns:1fr 1fr;
+    gap:20px;
+}
+
+.card{
+    background:#f5f6fa;
+    padding:20px;
+    border-radius:10px;
+}
+
+button{
+    width:100%;
+    padding:12px;
+    margin-top:10px;
+    border:none;
+    border-radius:8px;
+    background:var(--primary);
+    color:white;
+    cursor:pointer;
+}
+
+button:hover{ opacity:.9; }
+
+.node{
+    width:60px;
+    height:60px;
+    border-radius:50%;
+    display:flex;
+    justify-content:center;
+    align-items:center;
+    background:var(--primary);
+    color:white;
+    font-weight:bold;
+    cursor:pointer;
+    transition:0.3s;
+}
+
+.node:hover{
+    transform:scale(1.1);
+}
+
+.node.visited{
+    background:var(--success);
+}
+
+.node.selected{
+    border:4px solid var(--select);
+    transform:scale(1.15);
+}
+
+.graph{
+    display:grid;
+    grid-template-columns:repeat(3,1fr);
+    gap:10px;
+    justify-items:center;
+}
+
+.result{
+    display:none;
+    border-left:5px solid var(--success);
+}
+
+.result.show{ display:block; }
+
+</style>
+</head>
+
+<body>
+
+<div class="container">
+
+<h1>🔍 DFS Interactivo Profesional</h1>
+
+<div class="grid">
+
+<!-- GRAFO -->
+<div class="card">
+    <h3>Selecciona un nodo</h3>
+
+    <div class="graph">
+        <div></div>
+        <div class="node">A</div>
+        <div></div>
+
+        <div class="node">B</div>
+        <div></div>
+        <div class="node">C</div>
+
+        <div class="node">D</div>
+        <div class="node">E</div>
+        <div class="node">F</div>
+    </div>
+
+    <button onclick="app.run()">▶ Ejecutar DFS</button>
+    <button onclick="app.reset()">🔄 Reset</button>
+</div>
+
+<!-- RESULTADO -->
+<div class="card result" id="resultBox">
+    <h3>Resultado</h3>
+    <p><b>Orden:</b> <span id="order"></span></p>
+    <p><b>Nodos visitados:</b> <span id="count"></span></p>
+    <p><b>Profundidad máxima:</b> <span id="depth"></span></p>
+</div>
+
+</div>
+</div>
+
+<script>
+
+/* =========================
+   MODELO (DFS)
+========================= */
+
+class DFS {
+
+    constructor(graph){
+        this.graph = graph;
+        this.visited = new Set();
+        this.order = [];
+        this.maxDepth = 0;
+    }
+
+    run(start){
+        this._dfs(start,0);
+
+        return {
+            order:this.order,
+            count:this.visited.size,
+            depth:this.maxDepth
+        };
+    }
+
+    _dfs(node,depth){
+        if(!node || this.visited.has(node)) return;
+
+        this.visited.add(node);
+        this.order.push(node);
+        this.maxDepth = Math.max(this.maxDepth, depth);
+
+        for(const neighbor of this.graph[node]){
+            this._dfs(neighbor, depth+1);
+        }
+    }
+}
+
+/* =========================
+   VISTA (UI)
+========================= */
+
+class UI {
+
+    static selectNode(node){
+        document.querySelectorAll(".node").forEach(n=>{
+            n.classList.remove("selected");
+            if(n.textContent === node){
+                n.classList.add("selected");
+            }
+        });
+    }
+
+    static markNode(node){
+        document.querySelectorAll(".node").forEach(n=>{
+            if(n.textContent === node){
+                n.classList.add("visited");
+            }
+        });
+    }
+
+    static resetNodes(){
+        document.querySelectorAll(".node").forEach(n=>{
+            n.classList.remove("visited","selected");
+        });
+    }
+
+    static showResult(res){
+        resultBox.classList.add("show");
+        order.innerText = res.order.join(" → ");
+        count.innerText = res.count;
+        depth.innerText = res.depth;
+    }
+
+    static animate(order){
+        order.forEach((node,i)=>{
+            setTimeout(()=>{
+                this.markNode(node);
+            }, i * 400);
+        });
+    }
+}
+
+/* =========================
+   CONTROLADOR
+========================= */
+
+class App {
+
+    constructor(){
+        this.graph = {
+            A:["B","C"],
+            B:["D","E"],
+            C:["F"],
+            D:[],
+            E:["F"],
+            F:[]
+        };
+
+        this.startNode = null;
+        this.bindEvents();
+    }
+
+    bindEvents(){
+        document.querySelectorAll(".node").forEach(node=>{
+            node.addEventListener("click", () => {
+                this.startNode = node.textContent;
+                UI.selectNode(this.startNode);
+            });
+        });
+    }
+
+    run(){
+
+        if(!this.startNode){
+            alert("⚠️ Selecciona un nodo primero");
+            return;
+        }
+
+        UI.resetNodes();
+        UI.selectNode(this.startNode);
+
+        const dfs = new DFS(this.graph);
+        const res = dfs.run(this.startNode);
+
+        UI.showResult(res);
+        UI.animate(res.order);
+    }
+
+    reset(){
+        resultBox.classList.remove("show");
+        UI.resetNodes();
+        this.startNode = null;
+    }
+}
+
+/* =========================
+   INIT
+========================= */
+
+const resultBox = document.getElementById("resultBox");
+const order = document.getElementById("order");
+const count = document.getElementById("count");
+const depth = document.getElementById("depth");
+
+const app = new App();
+
+</script>
+
+</body>
+</html>
